@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->boolean('is_active');
             $table->text('description')->nullable();
+            $table->softDeletes();
+            
         });
     }
 
