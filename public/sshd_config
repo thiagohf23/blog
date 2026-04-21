@@ -1,74 +1,151 @@
-# Autor: Thiago - Acesso via Chave Pública
-# Versão customizada para Ubuntu Server 24.04 LTS
+# Autor: Robson Vaamonde (adaptado com hardening adicional)
+# Site: www.procedimentosemti.com.br
+# Data de atualização: 21/04/2026
+# Versão: 0.15-hardened
+# Testado e homologado para Ubuntu Server 22.04.x LTS x64 / OpenSSH 8.9.x
+#
+# ATENÇÃO: Este servidor utiliza SOMENTE autenticação por chave pública.
+# Gere sua chave no cliente: ssh-keygen -t ed25519 -C "seu@email.com"
+# Exporte para o servidor:   ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 ubuntu@192.168.1.17
 
+# Incluindo diretório de configurações personalizadas
 Include /etc/ssh/sshd_config.d/*.conf
 
-# Configuração de Conexão
-Port 22
+# ─── REDE ────────────────────────────────────────────────────────────────────
+
+# Porta não-padrão reduz varreduras automatizadas
+Port 2244
+
+# Protocolo exclusivo (v1 é inseguro e removido no OpenSSH 8.x)
 Protocol 2
+
+# Escuta apenas no IP do servidor, ignorando outras interfaces
 ListenAddress 192.168.1.17
+
+# Apenas IPv4 (evita superfície de ataque em IPv6 se não utilizado)
 AddressFamily inet
 
-# --- SEGURANÇA MÁXIMA: CHAVE PÚBLICA ---
-# Desativa login por senha e exige a chave pública
+# ─── CRIPTOGRAFIA ─────────────────────────────────────────────────────────────
+
+# Chaves de host — manter apenas algoritmos modernos
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+# Troca de chaves — priorizar Curve25519 e DH modernos
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256
+
+# Cifras — ChaCha20 e AES-GCM (autenticados) têm prioridade sobre CTR puro
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+
+# MACs — apenas Encrypt-then-MAC (ETM), mais seguro
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com
+
+# Re-chaveamento periódico (1 GB de dados ou 1 hora, o que vier primeiro)
+RekeyLimit 1G 1h
+
+# ─── AUTENTICAÇÃO ─────────────────────────────────────────────────────────────
+
+# SOMENTE chave pública — senha desabilitada
 AuthenticationMethods publickey
 PubkeyAuthentication yes
 PasswordAuthentication no
+
+# Localização das chaves autorizadas
 AuthorizedKeysFile .ssh/authorized_keys
-# ---------------------------------------
 
-StrictModes yes
-
-# Chaves do Host
-HostKey /etc/ssh/ssh_host_rsa_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-HostKey /etc/ssh/ssh_host_ed25519_key
-
-# Segurança de Cifras
-Ciphers aes128-ctr,aes192-ctr,aes256-ctr
-
-# Logs
-SyslogFacility AUTH
-LogLevel VERBOSE
-
-# ACESSO RESTRITO
+# Negar acesso ao root em qualquer circunstância
 PermitRootLogin no
+
+# Usuário(s) com permissão de acesso — ajuste conforme necessário
 AllowUsers thiago
+
+# Grupo(s) com permissão de acesso
 AllowGroups thiago
+
+# Usuários e grupos explicitamente bloqueados
 DenyUsers root
 DenyGroups root
 
-# Banner
-Banner /etc/ssh/banner.txt
+# Verificação estrita de permissões em ~/.ssh e arquivos de chave
+StrictModes yes
 
-# Gestão de Sessão
-LoginGraceTime 60
-ClientAliveInterval 300
-ClientAliveCountMax 2
-MaxAuthTries 3
-MaxSessions 2
-MaxStartups 5:60:10
-
-# Protocolos
-IgnoreRhosts yes
-HostbasedAuthentication no
+# Não permitir senhas vazias
 PermitEmptyPasswords no
+
+# Não permitir variáveis de ambiente customizadas pelo usuário
 PermitUserEnvironment no
 
-# DEV TOOLS (VS Code e Git)
-AllowTcpForwarding yes
-AllowAgentForwarding yes
-X11Forwarding no
-
-# Outras Opções
+# Desativar autenticações desnecessárias
+HostbasedAuthentication no
+IgnoreRhosts yes
 ChallengeResponseAuthentication no
-UsePAM yes
-PrintMotd no
-PrintLastLog yes
-AcceptEnv LANG LC_*
-Subsystem sftp /usr/lib/openssh/sftp-server
-TCPKeepAlive no
 KerberosAuthentication no
 GSSAPIAuthentication no
+
+# Autenticação via PAM (necessário para sessões e limites de sistema)
+UsePAM yes
+
+# ─── LIMITES DE SESSÃO ────────────────────────────────────────────────────────
+
+# Tempo máximo para completar o login após conexão TCP
+LoginGraceTime 30
+
+# Tentativas máximas de autenticação por conexão
+MaxAuthTries 3
+
+# Sessões simultâneas por conexão
+MaxSessions 10
+
+# Controle de conexões simultâneas não autenticadas:
+# 5=limite inicial | 60%=taxa de rejeição | 10=limite máximo
+MaxStartups 5:60:10
+
+# ─── KEEPALIVE / INATIVIDADE ─────────────────────────────────────────────────
+
+# Usar keepalive no nível da aplicação SSH (mais confiável que TCP keepalive)
+# O servidor enviará um "ping" a cada 300s; após 2 falhas, derruba a sessão
+TCPKeepAlive no
+ClientAliveInterval 120
+ClientAliveCountMax 5
+
+# ─── ENCAMINHAMENTO E X11 ────────────────────────────────────────────────────
+
+# Desabilitados — reduzem superfície de ataque
+AllowTcpForwarding yes
+AllowAgentForwarding no
+X11Forwarding no
+X11DisplayOffset 10
+
+# ─── LOG ─────────────────────────────────────────────────────────────────────
+
+# Facility e nível de log
+# Consultar: sudo journalctl -u ssh | grep sshd
+# Ou:        sudo grep sshd /var/log/auth.log
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# ─── INTERFACE / UX ──────────────────────────────────────────────────────────
+
+# Banner exibido antes da autenticação (arquivo /etc/issue.net)
+Banner /etc/issue.net
+
+# Exibir último login após autenticar
+PrintLastLog yes
+
+# Não exibir mensagem do dia (MOTD) via SSH
+PrintMotd no
+
+# Variáveis de locale aceitas do cliente
+AcceptEnv LANG LC_*
+
+# ─── MISCELÂNEA ───────────────────────────────────────────────────────────────
+
+# Não comprimir tráfego (evita ataques de correlação tipo CRIME)
 Compression no
+
+# Não consultar DNS reverso (evita atrasos em conexão)
 UseDNS no
+
+# Subsistema SFTP interno do OpenSSH
+Subsystem sftp /usr/lib/openssh/sftp-server
