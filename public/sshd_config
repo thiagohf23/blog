@@ -1,0 +1,74 @@
+# Autor: Thiago - Acesso via Chave Pública
+# Versão customizada para Ubuntu Server 24.04 LTS
+
+Include /etc/ssh/sshd_config.d/*.conf
+
+# Configuração de Conexão
+Port 22
+Protocol 2
+ListenAddress 192.168.1.17
+AddressFamily inet
+
+# --- SEGURANÇA MÁXIMA: CHAVE PÚBLICA ---
+# Desativa login por senha e exige a chave pública
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PasswordAuthentication no
+AuthorizedKeysFile .ssh/authorized_keys
+# ---------------------------------------
+
+StrictModes yes
+
+# Chaves do Host
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Segurança de Cifras
+Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+
+# Logs
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# ACESSO RESTRITO
+PermitRootLogin no
+AllowUsers thiago
+AllowGroups thiago
+DenyUsers root
+DenyGroups root
+
+# Banner
+Banner /etc/ssh/banner.txt
+
+# Gestão de Sessão
+LoginGraceTime 60
+ClientAliveInterval 300
+ClientAliveCountMax 2
+MaxAuthTries 3
+MaxSessions 2
+MaxStartups 5:60:10
+
+# Protocolos
+IgnoreRhosts yes
+HostbasedAuthentication no
+PermitEmptyPasswords no
+PermitUserEnvironment no
+
+# DEV TOOLS (VS Code e Git)
+AllowTcpForwarding yes
+AllowAgentForwarding yes
+X11Forwarding no
+
+# Outras Opções
+ChallengeResponseAuthentication no
+UsePAM yes
+PrintMotd no
+PrintLastLog yes
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+TCPKeepAlive no
+KerberosAuthentication no
+GSSAPIAuthentication no
+Compression no
+UseDNS no
