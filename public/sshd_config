@@ -1,13 +1,7 @@
-# Autor: Robson Vaamonde (adaptado com hardening adicional)
-# Site: www.procedimentosemti.com.br
-# Data de atualização: 21/04/2026
-# Versão: 0.15-hardened
+# Autor: Thiago 
 # Testado e homologado para Ubuntu Server 22.04.x LTS x64 / OpenSSH 8.9.x
-#
 # ATENÇÃO: Este servidor utiliza SOMENTE autenticação por chave pública.
 # Gere sua chave no cliente: ssh-keygen -t ed25519 -C "seu@email.com"
-# Exporte para o servidor:   ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 ubuntu@192.168.1.17
-
 # Incluindo diretório de configurações personalizadas
 Include /etc/ssh/sshd_config.d/*.conf
 
